@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Stream with Emotion Detection</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        video {
+            width: 60%;
+            max-width: 800px;
+            border: 2px solid #333;
+            border-radius: 10px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #emotion {
+            margin-top: 20px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebRTC Video Stream with Emotion Detection</h1>
+    <video id="video" autoplay playsinline></video>
+    <button id="startStream">Start Stream</button>
+    <button id="startViewing">Start Viewing</button>
+    <p id="emotion">Emotion: N/A</p>
+    
+    <script>
+        const videoElement = document.getElementById("video");
+        const startButton = document.getElementById("startStream");
+        const viewButton = document.getElementById("startViewing");
+        const emotionText = document.getElementById("emotion");
+        let peerConnection;
+        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+        const socket = new WebSocket("wss://your-signaling-server.com");
+
+        startButton.addEventListener("click", async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                videoElement.srcObject = stream;
+                await loadModels();
+                detectEmotions();
+                startBroadcast(stream);
+            } catch (error) {
+                console.error("Error accessing webcam: ", error);
+                alert("Failed to access the webcam");
+            }
+        });
+
+        viewButton.addEventListener("click", () => {
+            startViewing();
+        });
+
+        async function loadModels() {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models');
+            await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models');
+        }
+
+        async function detectEmotions() {
+            setInterval(async () => {
+                const detections = await faceapi.detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+                if (detections.length > 0) {
+                    const expressions = detections[0].expressions;
+                    const maxExpression = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
+                    emotionText.textContent = `Emotion: ${maxExpression.toUpperCase()}`;
+                }
+            }, 1000);
+        }
+
+        function startBroadcast(stream) {
+            peerConnection = new RTCPeerConnection(config);
+            stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({ candidate: event.candidate }));
+                }
+            };
+            peerConnection.createOffer().then(offer => {
+                peerConnection.setLocalDescription(offer);
+                socket.send(JSON.stringify({ offer }));
+            });
+        }
+
+        function startViewing() {
+            peerConnection = new RTCPeerConnection(config);
+            peerConnection.ontrack = event => {
+                videoElement.srcObject = event.streams[0];
+            };
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({ candidate: event.candidate }));
+                }
+            };
+            socket.onmessage = message => {
+                const data = JSON.parse(message.data);
+                if (data.offer) {
+                    peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    peerConnection.createAnswer().then(answer => {
+                        peerConnection.setLocalDescription(answer);
+                        socket.send(JSON.stringify({ answer }));
+                    });
+                } else if (data.candidate) {
+                    peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            };
+        }
+    </script>
+</body>
+</html>
