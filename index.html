@@ -3,130 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Video Stream with Emotion Detection</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+    <title>Holika Drishyam</title>
     <style>
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
             background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
         }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .video-container {
+            width: 80%;
+            max-width: 1200px;
+            margin: 20px 0;
+            position: relative;
+        }
+        
         video {
-            width: 60%;
-            max-width: 800px;
-            border: 2px solid #333;
-            border-radius: 10px;
+            width: 100%;
+            border-radius: 8px;
+            background-color: #000;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        button {
+        
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
             margin-top: 20px;
-            padding: 10px 20px;
+            width: 80%;
+            max-width: 400px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        button {
+            padding: 12px 20px;
             font-size: 16px;
-            background-color: #28a745;
+            background-color: #2196F3;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.3s;
         }
+        
         button:hover {
-            background-color: #218838;
+            background-color: #0b7dda;
         }
-        #emotion {
-            margin-top: 20px;
-            font-size: 20px;
+        
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            margin-top: 15px;
             font-weight: bold;
+            color: #333;
+        }
+        
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <h1>WebRTC Video Stream with Emotion Detection</h1>
-    <video id="video" autoplay playsinline></video>
-    <button id="startStream">Start Stream</button>
-    <button id="startViewing">Start Viewing</button>
-    <p id="emotion">Emotion: N/A</p>
+    <h1>🙏 HARI OM 🙏</h1>
+    <div class="subtitle">(Holi Ground live view)</div>
+    
+    <div class="video-container">
+        <video id="videoElement" autoplay playsinline></video>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group" id="broadcastControls">
+            <h2>Start Broadcasting</h2>
+            <input type="password" id="broadcastPassword" placeholder="Enter broadcast password">
+            <button id="startBroadcast">Start Broadcasting</button>
+            <p class="status" id="broadcastStatus"></p>
+        </div>
+        
+        <div class="control-group" id="viewControls">
+            <h2>View Broadcast</h2>
+            <button id="startViewing">Start Viewing</button>
+            <p class="status" id="viewStatus"></p>
+        </div>
+    </div>
     
     <script>
-        const videoElement = document.getElementById("video");
-        const startButton = document.getElementById("startStream");
-        const viewButton = document.getElementById("startViewing");
-        const emotionText = document.getElementById("emotion");
+        // DOM Elements
+        const videoElement = document.getElementById('videoElement');
+        const startBroadcastButton = document.getElementById('startBroadcast');
+        const startViewingButton = document.getElementById('startViewing');
+        const broadcastPassword = document.getElementById('broadcastPassword');
+        const broadcastStatus = document.getElementById('broadcastStatus');
+        const viewStatus = document.getElementById('viewStatus');
+        
+        // WebRTC variables
         let peerConnection;
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-        const socket = new WebSocket("wss://your-signaling-server.com");
-
-        startButton.addEventListener("click", async () => {
+        let localStream;
+        const config = { 
+            iceServers: [
+                { urls: "stun:stun.l.google.com:19302" },
+                { urls: "stun:stun1.l.google.com:19302" },
+                { urls: "stun:stun2.l.google.com:19302" }
+            ],
+            iceCandidatePoolSize: 10
+        };
+        
+        // Simulated signaling server (in a real app, this would be a WebSocket connection)
+        let offerSDP = null;
+        let iceCandidates = [];
+        
+        // Password for broadcasting
+        const BROADCAST_PASSWORD = "12345";
+        
+        // Start Broadcasting
+        startBroadcastButton.addEventListener('click', async () => {
+            // Validate password
+            if (broadcastPassword.value !== BROADCAST_PASSWORD) {
+                broadcastStatus.textContent = "Incorrect password!";
+                broadcastStatus.style.color = "#d32f2f";
+                return;
+            }
+            
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                // Get high-definition video stream
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: true
+                });
+                
+                localStream = stream;
                 videoElement.srcObject = stream;
-                await loadModels();
-                detectEmotions();
-                startBroadcast(stream);
+                
+                // Create peer connection
+                peerConnection = new RTCPeerConnection(config);
+                
+                // Add all tracks to the peer connection
+                stream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, stream);
+                });
+                
+                // Collect ICE candidates
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        iceCandidates.push(event.candidate);
+                    }
+                };
+                
+                // Create offer
+                const offer = await peerConnection.createOffer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                });
+                
+                await peerConnection.setLocalDescription(offer);
+                
+                // Store the offer for viewers
+                offerSDP = offer;
+                
+                broadcastStatus.textContent = "Broadcasting... Waiting for viewers";
+                broadcastStatus.style.color = "#4CAF50";
+                startBroadcastButton.disabled = true;
+                
+                // Hide viewing controls while broadcasting
+                viewControls.classList.add('hidden');
+                
             } catch (error) {
-                console.error("Error accessing webcam: ", error);
-                alert("Failed to access the webcam");
+                console.error("Error starting broadcast: ", error);
+                broadcastStatus.textContent = "Failed to access camera and microphone";
+                broadcastStatus.style.color = "#d32f2f";
             }
         });
-
-        viewButton.addEventListener("click", () => {
-            startViewing();
+        
+        // Start Viewing
+        startViewingButton.addEventListener('click', async () => {
+            if (!offerSDP) {
+                viewStatus.textContent = "No active broadcast available";
+                viewStatus.style.color = "#d32f2f";
+                return;
+            }
+            
+            try {
+                // Create peer connection
+                peerConnection = new RTCPeerConnection(config);
+                
+                // Set up remote tracks
+                peerConnection.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        videoElement.srcObject = event.streams[0];
+                    }
+                };
+                
+                // Set remote description (the offer from broadcaster)
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offerSDP));
+                
+                // Create answer
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                // Add collected ICE candidates
+                for (const candidate of iceCandidates) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                }
+                
+                viewStatus.textContent = "Connected to broadcast";
+                viewStatus.style.color = "#4CAF50";
+                startViewingButton.disabled = true;
+                
+                // Hide broadcast controls while viewing
+                broadcastControls.classList.add('hidden');
+                
+            } catch (error) {
+                console.error("Error viewing broadcast: ", error);
+                viewStatus.textContent = "Failed to connect to broadcast";
+                viewStatus.style.color = "#d32f2f";
+            }
         });
-
-        async function loadModels() {
-            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models');
-            await faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js/models');
-        }
-
-        async function detectEmotions() {
-            setInterval(async () => {
-                const detections = await faceapi.detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
-                if (detections.length > 0) {
-                    const expressions = detections[0].expressions;
-                    const maxExpression = Object.keys(expressions).reduce((a, b) => expressions[a] > expressions[b] ? a : b);
-                    emotionText.textContent = `Emotion: ${maxExpression.toUpperCase()}`;
-                }
-            }, 1000);
-        }
-
-        function startBroadcast(stream) {
-            peerConnection = new RTCPeerConnection(config);
-            stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    socket.send(JSON.stringify({ candidate: event.candidate }));
-                }
-            };
-            peerConnection.createOffer().then(offer => {
-                peerConnection.setLocalDescription(offer);
-                socket.send(JSON.stringify({ offer }));
-            });
-        }
-
-        function startViewing() {
-            peerConnection = new RTCPeerConnection(config);
-            peerConnection.ontrack = event => {
-                videoElement.srcObject = event.streams[0];
-            };
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    socket.send(JSON.stringify({ candidate: event.candidate }));
-                }
-            };
-            socket.onmessage = message => {
-                const data = JSON.parse(message.data);
-                if (data.offer) {
-                    peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-                    peerConnection.createAnswer().then(answer => {
-                        peerConnection.setLocalDescription(answer);
-                        socket.send(JSON.stringify({ answer }));
-                    });
-                } else if (data.candidate) {
-                    peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
-        }
+        
+        // Clean up when the page is closed
+        window.addEventListener('beforeunload', () => {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            
+            if (peerConnection) {
+                peerConnection.close();
+            }
+        });
     </script>
 </body>
 </html>
