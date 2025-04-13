@@ -1,283 +1,109 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HD Video Stream</title>
-    <!-- Firebase App (the core Firebase SDK) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.17.2/firebase-app-compat.min.js"></script>
-    <!-- Firebase Database -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.17.2/firebase-database-compat.min.js"></script>
+    <meta charset="utf-8">
+    <title>Enhanced Tank Game - Voice Control</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #fafafa;
-            color: #333;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .container {
-            max-width: 1200px;
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
             width: 100%;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
         }
-        
-        video {
+        #transcript {
+            position: absolute;
+            bottom: 10px;
             width: 100%;
-            background: #000;
-            border-radius: 4px;
-            margin-bottom: 20px;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
         }
-        
-        .controls {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 20px;
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: red;
+            font-size: 48px;
+            font-family: Arial, sans-serif;
+            display: none;
+            text-align: center;
+            text-shadow: 2px 2px 4px black;
         }
-        
-        button {
-            background: #0070f3;
+        #voice-control {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
             color: white;
             border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            font-size: 14px;
+            border-radius: 5px;
             cursor: pointer;
-            transition: background 0.2s;
         }
-        
-        button:hover {
-            background: #0051cc;
+        #voice-control:hover {
+            background-color: #0056b3;
         }
-        
-        button:disabled {
-            background: #ccc;
+        #voice-control:disabled {
+            background-color: #ccc;
             cursor: not-allowed;
         }
-        
-        input {
-            border: 1px solid #ddd;
-            padding: 8px;
-            border-radius: 4px;
-            font-size: 14px;
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            text-shadow: 2px 2px 4px black;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
         }
-        
-        .status {
-            margin-top: 10px;
+        #controls-info {
+            position: absolute;
+            top: 80px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
             font-size: 14px;
-            color: #666;
-        }
-        
-        .hidden {
-            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Video Stream</h1>
-        
-        <video id="videoElement" autoplay playsinline muted></video>
-        
-        <div class="controls">
-            <div id="broadcastSection">
-                <div>
-                    <input type="password" id="broadcastPassword" placeholder="Password">
-                    <button id="startBroadcast">Start Broadcast</button>
-                </div>
-                <div class="status" id="broadcastStatus"></div>
-            </div>
-            
-            <div id="viewSection">
-                <button id="startViewing">View Broadcast</button>
-                <div class="status" id="viewStatus"></div>
-            </div>
-        </div>
+    <div id="loading">Loading game assets...</div>
+    <div id="info">
+        <h1>Enhanced Tank Game</h1>
+        <p>Say "hari om" to fire at the nearest enemy!</p>
+        <p>Score: <span id="score">0</span></p>
     </div>
+    <div id="controls-info">
+        <p>Press SPACE to fire | Press P to pause/resume</p>
+    </div>
+    <div id="transcript">Ready to listen...</div>
+    <div id="game-over">
+        GAME OVER<br>
+        <span id="final-score"></span><br>
+        Click to restart
+    </div>
+    <button id="voice-control">Start Voice Control</button>
     
-    <script>
-        // Initialize Firebase
-        const firebaseConfig = {
-            // Use a placeholder Firebase config here - replace with your own when deploying
-            apiKey: "AIzaSyBOlqYkjnIW1X-sJaZ7geKxNQGqZGJoAhQ",
-            authDomain: "webrtc-streaming-demo.firebaseapp.com",
-            databaseURL: "https://webrtc-streaming-demo-default-rtdb.firebaseio.com",
-            projectId: "webrtc-streaming-demo",
-            storageBucket: "webrtc-streaming-demo.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:1234567890abcdef123456"
-        };
-        
-        // Initialize Firebase (with a placeholder config)
-        firebase.initializeApp(firebaseConfig);
-        
-        // DOM Elements
-        const videoElement = document.getElementById('videoElement');
-        const startBroadcastButton = document.getElementById('startBroadcast');
-        const startViewingButton = document.getElementById('startViewing');
-        const broadcastPassword = document.getElementById('broadcastPassword');
-        const broadcastStatus = document.getElementById('broadcastStatus');
-        const viewStatus = document.getElementById('viewStatus');
-        
-        // WebRTC variables
-        let peerConnection;
-        let localStream;
-        const BROADCAST_PASSWORD = "12345";
-        const streamId = "main-stream"; // We'll use a fixed stream ID for this simple example
-        
-        // ICE Server configuration
-        const config = {
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                { urls: "stun:stun2.l.google.com:19302" }
-            ],
-            iceCandidatePoolSize: 10
-        };
-        
-        // Database references
-        const db = firebase.database();
-        const offerRef = db.ref('offers/' + streamId);
-        const answersRef = db.ref('answers/' + streamId);
-        const iceCandidatesRef = db.ref('iceCandidates/' + streamId);
-        
-        // Start broadcasting
-        startBroadcastButton.addEventListener('click', async () => {
-            if (broadcastPassword.value !== BROADCAST_PASSWORD) {
-                broadcastStatus.textContent = "Incorrect password";
-                return;
-            }
-            
-            try {
-                // Clear any existing data
-                await offerRef.remove();
-                await answersRef.remove();
-                await iceCandidatesRef.remove();
-                
-                // Get high-definition video stream
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 },
-                        frameRate: { ideal: 30 }
-                    },
-                    audio: true
-                });
-                
-                localStream = stream;
-                videoElement.srcObject = stream;
-                videoElement.muted = true; // Prevent feedback when broadcasting
-                
-                // Create peer connection
-                peerConnection = new RTCPeerConnection(config);
-                
-                // Add all tracks to the peer connection
-                stream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, stream);
-                });
-                
-                // Listen for viewer answers
-                answersRef.on('child_added', async snapshot => {
-                    const answer = snapshot.val();
-                    if (!peerConnection.currentRemoteDescription) {
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                        broadcastStatus.textContent = "Viewer connected";
-                    }
-                });
-                
-                // Collect and save ICE candidates
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        iceCandidatesRef.child('broadcaster').push(event.candidate.toJSON());
-                    }
-                };
-                
-                // Create offer
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
-                
-                // Save the offer to Firebase
-                await offerRef.set(offer);
-                
-                broadcastStatus.textContent = "Broadcasting... waiting for viewers";
-                startBroadcastButton.disabled = true;
-                
-            } catch (error) {
-                console.error("Error starting broadcast: ", error);
-                broadcastStatus.textContent = "Failed to access camera";
-            }
-        });
-        
-        // Start viewing
-        startViewingButton.addEventListener('click', async () => {
-            try {
-                // Check if there's an active broadcast
-                const offerSnapshot = await offerRef.once('value');
-                const offer = offerSnapshot.val();
-                
-                if (!offer) {
-                    viewStatus.textContent = "No active broadcast available";
-                    return;
-                }
-                
-                // Create peer connection
-                peerConnection = new RTCPeerConnection(config);
-                
-                // Set up to receive tracks
-                peerConnection.ontrack = event => {
-                    videoElement.srcObject = event.streams[0];
-                    viewStatus.textContent = "Connected to broadcast";
-                };
-                
-                // Collect and save ICE candidates
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        iceCandidatesRef.child('viewer').push(event.candidate.toJSON());
-                    }
-                };
-                
-                // Get ICE candidates from broadcaster
-                iceCandidatesRef.child('broadcaster').on('child_added', snapshot => {
-                    const candidate = snapshot.val();
-                    peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                });
-                
-                // Set the remote description (offer)
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                
-                // Create answer
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                // Save the answer to Firebase
-                await answersRef.push(answer);
-                
-                viewStatus.textContent = "Connecting to broadcast...";
-                startViewingButton.disabled = true;
-                
-            } catch (error) {
-                console.error("Error viewing broadcast: ", error);
-                viewStatus.textContent = "Failed to connect to broadcast";
-            }
-        });
-        
-        // Clean up when the page is closed
-        window.addEventListener('beforeunload', () => {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-            }
-            
-            if (peerConnection) {
-                peerConnection.close();
-            }
-            
-            // Clean up Firebase listeners
-            answersRef.off();
-            iceCandidatesRef.off();
-        });
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script type="module" src="js/game.js"></script>
 </body>
 </html>
