@@ -8,6 +8,9 @@ import Enemy from './enemies.js';
 import VoiceHandler from './voiceHandler.js';
 import UI from './ui.js';
 
+// Re-export GameManager so it can be imported externally
+export { GameManager, GameState, Tank, Enemy, VoiceHandler, UI };
+
 // Create and export game manager instance
 export const gameManager = new GameManager();
 window.gameManager = gameManager; // Make available globally

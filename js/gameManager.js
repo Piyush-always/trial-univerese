@@ -2,6 +2,11 @@
  * Game Manager - Handles game state and core game loop
  */
 
+import UI from './ui.js';
+import Tank from './tank.js';
+import Enemy from './enemies.js';
+import VoiceHandler from './voiceHandler.js';
+
 // Game states
 const GameState = {
   LOADING: 'loading',
