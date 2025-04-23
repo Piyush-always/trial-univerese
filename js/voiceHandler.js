@@ -53,8 +53,8 @@ class VoiceHandler {
       this.transcriptElement.textContent = `Heard: ${fullTranscript}`;
       
       // Check for "hari om" and fire if detected
-      const hariOmCount = (fullTranscript.match(/\bhari om\b/g) || []).length;
-      const lastHariOmCount = (this.lastTranscript.match(/\bhari om\b/g) || []).length;
+      const hariOmCount = (fullTranscript.match(/\bmansi\b/g) || []).length;
+      const lastHariOmCount = (this.lastTranscript.match(/\bmansi\b/g) || []).length;
       
       if (hariOmCount > lastHariOmCount) {
         // Fire the nuke for each new "hari om" detected
